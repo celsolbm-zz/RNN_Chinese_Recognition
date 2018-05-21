@@ -13,26 +13,26 @@ from random import randint
 import random
 
 tf.set_random_seed(0)
-
+############ALMOST EVERYTHING IS EQUAL TO THE RNN_REGULAR. JUST CHANGE THE WHILE LOOP. 
 SEQLEN = 270
 BATCHSIZE = 1000
 ALPHASIZE = 6
 BETASIZE = 3756
 INTERNALSIZE = 100
 NLAYERS = 1
-learning_rate = 0.0001  # fixed learning rate
-dropout_pkeep = 0.8    # some dropout
+learning_rate = 0.001  
+dropout_pkeep = 0.8    
 L=200
 char_class=3756
 
-with open ('chlist_t', 'rb') as fp:
+with open ('chlist_t', 'rb') as fp:  ### Load the test data set instead of the normal one
     chlist_t = pickle.load(fp)
 
 
 with open ('lbl1h_t', 'rb') as fp:
     lbl1h_t = pickle.load(fp)
 
-with open('cellsandlayersFULL.pkl','rb') as f:  # Python 3: open(..., 'rb')
+with open('cellsandlayersFULL.pkl','rb') as f:  # open the trained values for the cells and layers
     cellf, cellb,l1,l2,b1,b2, cellfa,cellba,l1a,l2a,b1a,b2a,istate,istate2 = pickle.load(f)
 
 usls=[0,0,0,0,0,0]
@@ -51,27 +51,15 @@ with tf.device('/device:GPU:0'):
     Xf = tf.placeholder(tf.float32, [None, None, 6], name='Xf')    # [ BATCHSIZE, SEQLEN ]
     Y_ = tf.placeholder(tf.int32, [None], name='Y_')  # [ BATCHSIZE, SEQLEN ]
     Yo_ = tf.one_hot(Y_, BETASIZE, 1.0, 0.0)
-    #yrtt,htst = sess.run([Yr, H], feed_dict=feed_dict)
-    # input state
     Hinf = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinf')  # [ BATCHSIZE, INTERNALSIZE * NLAYERS]
     Hinb = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinb')
-    # How to properly apply dropout in RNNs: see README.md
     cellfwd = rnn.GRUCell(INTERNALSIZE)
     dcellfwd = rnn.DropoutWrapper(cellfwd,input_keep_prob=1)
     cellbwd = rnn.GRUCell(INTERNALSIZE)
     dcellbwd = rnn.DropoutWrapper(cellbwd,input_keep_prob=1)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)
-    # "naive dropout" implementation
-    #dropcells = [rnn.DropoutWrapper(cell,input_keep_prob=pkeep) for cell in cells]
-    #multicell = rnn.MultiRNNCell(dropcells, state_is_tuple=False)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)  # dropout for the softmax layer
     Yr, H = tf.nn.bidirectional_dynamic_rnn(dcellfwd,dcellbwd, Xf, dtype=tf.float32, initial_state_fw=Hinf,initial_state_bw=Hinb)
-    # Yr: [ BATCHSIZE, SEQLEN, INTERNALSIZE ]
-    # H:  [ BATCHSIZE, INTERNALSIZE*NLAYERS ] # this is the last state in the sequence
     H = tf.identity(H, name='H')  # just to give it a name
     Yr = tf.identity(Yr, name='Yr')
-    #Hf = tf.identity(H[0], name='Hf')  # just to give it a name
-    #Hb = tf.identity(H[1], name='Hb')
     Yrta2=tf.add(Yr[0],Yr[1],name='Yrta2')
     Yrta2=tf.div(Yrta2,2)
     Ypoo=tf.layers.average_pooling1d(Yrta2,[3],strides=[3])
@@ -127,7 +115,7 @@ fp1=0
 fn=0
 fn1=0
 
-
+#load the values of the trained cells and layers into the current cells and layers
 sess.run(tf.assign(sess.graph.get_tensor_by_name('fully_connected_1/weights:0'),l2a))
 sess.run(tf.assign(sess.graph.get_tensor_by_name('fully_connected/weights:0'),l1a))
 sess.run(tf.assign(sess.graph.get_tensor_by_name('fully_connected_1/biases:0'),b2a))

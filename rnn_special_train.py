@@ -13,6 +13,8 @@ from random import randint
 import random
 
 tf.set_random_seed(0)
+#####CHECK THE REGULAR TRAIN FOR MOST DETAILED COMMENTS. HERE I JUST CHANGE THE COMENTS FROM THE TRAINING WHILE LOOP
+
 
 SEQLEN = 270
 BATCHSIZE = 1000
@@ -49,27 +51,15 @@ with tf.device('/device:GPU:0'):
     Xf = tf.placeholder(tf.float32, [None, None, 6], name='Xf')    # [ BATCHSIZE, SEQLEN ]
     Y_ = tf.placeholder(tf.int32, [None], name='Y_')  # [ BATCHSIZE, SEQLEN ]
     Yo_ = tf.one_hot(Y_, BETASIZE, 1.0, 0.0)
-    #yrtt,htst = sess.run([Yr, H], feed_dict=feed_dict)
-    # input state
     Hinf = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinf')  # [ BATCHSIZE, INTERNALSIZE * NLAYERS]
     Hinb = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinb')
-    # How to properly apply dropout in RNNs: see README.md
     cellfwd = rnn.GRUCell(INTERNALSIZE)
     dcellfwd = rnn.DropoutWrapper(cellfwd,input_keep_prob=0.8)
     cellbwd = rnn.GRUCell(INTERNALSIZE)
     dcellbwd = rnn.DropoutWrapper(cellbwd,input_keep_prob=0.8)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)
-    # "naive dropout" implementation
-    #dropcells = [rnn.DropoutWrapper(cell,input_keep_prob=pkeep) for cell in cells]
-    #multicell = rnn.MultiRNNCell(dropcells, state_is_tuple=False)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)  # dropout for the softmax layer
     Yr, H = tf.nn.bidirectional_dynamic_rnn(dcellfwd,dcellbwd, Xf, dtype=tf.float32, initial_state_fw=Hinf,initial_state_bw=Hinb)
-    # Yr: [ BATCHSIZE, SEQLEN, INTERNALSIZE ]
-    # H:  [ BATCHSIZE, INTERNALSIZE*NLAYERS ] # this is the last state in the sequence
     H = tf.identity(H, name='H')  # just to give it a name
     Yr = tf.identity(Yr, name='Yr')
-    #Hf = tf.identity(H[0], name='Hf')  # just to give it a name
-    #Hb = tf.identity(H[1], name='Hb')
     Yrta2=tf.add(Yr[0],Yr[1],name='Yrta2')
     Yrta2=tf.div(Yrta2,2)
     Ypoo=tf.layers.average_pooling1d(Yrta2,[3],strides=[3])
@@ -111,8 +101,7 @@ def unison_shuffled_list(a, b):
 
 
 
-#a, c = sess.run([accuracy, cross_entropy], {Xf: xft, Y_: yt, Hinf: istate, Hinb: istate2})
-#yf = sess.run([tf.argmax(Yf, 1)], {Xf: xft, Y_: yt, Hinf: istate, Hinb: istate2})
+
 chlist,lbl1h=unison_shuffled_list(chlist,lbl1h)
 for i in range(50000+1):
     if i>10000:
@@ -128,7 +117,7 @@ for i in range(50000+1):
             sp_index.append(it)
     for j in range(len(y)):
         if y[j]>1200:
-            y[j]=randint(0,3755)
+            y[j]=randint(0,3755)    #stochastic cmcl. Change any out of distribution classes to a random value after a while.
     ind=ind2
     ind2=ind2+BATCHSIZE
     if ind2>len(chlist):

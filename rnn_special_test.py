@@ -14,13 +14,15 @@ import random
 
 tf.set_random_seed(0)
 
+
+#####SAME AS REGULAR, WITH DIFFERENCE ON THE TRAINING LOOP
 SEQLEN = 270
 BATCHSIZE = 1000
 ALPHASIZE = 6
 BETASIZE = 3756
 INTERNALSIZE = 100
 NLAYERS = 1
-learning_rate = 0.0001  # fixed learning rate
+learning_rate = 0.001  # fixed learning rate
 dropout_pkeep = 0.8    # some dropout
 L=200
 char_class=3756
@@ -51,27 +53,15 @@ with tf.device('/device:GPU:0'):
     Xf = tf.placeholder(tf.float32, [None, None, 6], name='Xf')    # [ BATCHSIZE, SEQLEN ]
     Y_ = tf.placeholder(tf.int32, [None], name='Y_')  # [ BATCHSIZE, SEQLEN ]
     Yo_ = tf.one_hot(Y_, BETASIZE, 1.0, 0.0)
-    #yrtt,htst = sess.run([Yr, H], feed_dict=feed_dict)
-    # input state
     Hinf = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinf')  # [ BATCHSIZE, INTERNALSIZE * NLAYERS]
     Hinb = tf.placeholder(tf.float32, [None, INTERNALSIZE*NLAYERS], name='Hinb')
-    # How to properly apply dropout in RNNs: see README.md
     cellfwd = rnn.GRUCell(INTERNALSIZE)
-    dcellfwd = rnn.DropoutWrapper(cellfwd,input_keep_prob=1)
+    dcellfwd = rnn.DropoutWrapper(cellfwd,input_keep_prob=0.8)
     cellbwd = rnn.GRUCell(INTERNALSIZE)
-    dcellbwd = rnn.DropoutWrapper(cellbwd,input_keep_prob=1)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)
-    # "naive dropout" implementation
-    #dropcells = [rnn.DropoutWrapper(cell,input_keep_prob=pkeep) for cell in cells]
-    #multicell = rnn.MultiRNNCell(dropcells, state_is_tuple=False)
-    #multicell = rnn.DropoutWrapper(multicell, output_keep_prob=pkeep)  # dropout for the softmax layer
+    dcellbwd = rnn.DropoutWrapper(cellbwd,input_keep_prob=0.8)
     Yr, H = tf.nn.bidirectional_dynamic_rnn(dcellfwd,dcellbwd, Xf, dtype=tf.float32, initial_state_fw=Hinf,initial_state_bw=Hinb)
-    # Yr: [ BATCHSIZE, SEQLEN, INTERNALSIZE ]
-    # H:  [ BATCHSIZE, INTERNALSIZE*NLAYERS ] # this is the last state in the sequence
     H = tf.identity(H, name='H')  # just to give it a name
     Yr = tf.identity(Yr, name='Yr')
-    #Hf = tf.identity(H[0], name='Hf')  # just to give it a name
-    #Hb = tf.identity(H[1], name='Hb')
     Yrta2=tf.add(Yr[0],Yr[1],name='Yrta2')
     Yrta2=tf.div(Yrta2,2)
     Ypoo=tf.layers.average_pooling1d(Yrta2,[3],strides=[3])
@@ -142,7 +132,7 @@ sess.run(tf.assign(cellbwd.variables[2],cellba[2]))
 sess.run(tf.assign(cellbwd.variables[3],cellba[3]))
 
 
-tsh=1.5
+tsh=1.5   #ENTROPY THRESHOLD! VERY IMPORTANT
 
 chlist_t,lbl1h_t=unison_shuffled_list(chlist_t,lbl1h_t)
 
@@ -155,7 +145,7 @@ while(True):
     y=np.asarray(lbl1h_t[ind:ind2])
     for it in range(len(y)):
         if y[it]<=1200:
-            sp_index.append(it)
+            sp_index.append(it)   #loop to check from the dataset which examples were in-distribution
     ind=ind2
     ind2=ind2+BATCHSIZE
     if ind2>len(chlist_t):
@@ -165,14 +155,14 @@ while(True):
     real_pred=[]
     real_ent=[]
     ##########
-    for it in range(len(sp_index)):
+    for it in range(len(sp_index)):   ###loop to get the values of the errors from in distribution values
         if e_l[sp_index[it]]<tsh:
-            real_ent.append(e_l[sp_index[it]])
+            real_ent.append(e_l[sp_index[it]])        #if it is lower than the threshold it does not go to the error rate calculation
             continue    
-        real_pred.append(pred[sp_index[it]])    
+        real_pred.append(pred[sp_index[it]])          #if it is higher than the threshold it goes to error rate calculation
         real_ent.append(e_l[sp_index[it]])
     ##########
-    for it in range(len(pred)):
+    for it in range(len(pred)):                       #calculate false positive and false negative rate (pretty simple to understand)
         if sp_index.count(it):
             continue
         if e_l[it]<tsh:
